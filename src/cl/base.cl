@@ -68,6 +68,13 @@ G_H        "group height" == SMALL_HEIGHT / NH
 #define OLD_FENCE 1
 #endif
 
+// Nonteporal reads and writes might be a little bit faster on many GPUs by keeping more reusable data in the caches.
+// However, on those GPUs with large caches there should be a significant speed gain from keeping FFT data in the caches.
+// Default to the big win when caching is beneficial rather than the tiny gain when non-temporal is better.
+#if !defined(NONTEMPORAL)
+#define NONTEMPORAL 0
+#endif
+
 #if FFT_VARIANT > 3
 #error FFT_VARIANT must be between 0 and 3
 #endif
@@ -127,14 +134,21 @@ typedef double2 T2;
 #define CP(x) const P(x)
 
 // Macros for non-temporal load and store (in case we later want to provide a -use option to turn this off)
+#if NONTEMPORAL && defined(__has_builtin) && __has_builtin(__builtin_nontemporal_load) && __has_builtin(__builtin_nontemporal_store)
 #define NTLOAD(mem)        __builtin_nontemporal_load(&(mem))
 #define NTSTORE(mem,val)   __builtin_nontemporal_store(val, &(mem))
+#else
+#define NTLOAD(mem)        (mem)
+#define NTSTORE(mem,val)   (mem) = val
+#endif
 
 // For reasons unknown, loading trig values into nVidia's constant cache has terrible performance
 #if AMDGPU
 typedef constant const T2* Trig;
+typedef constant const T* TrigSingle;
 #else
 typedef global const T2* Trig;
+typedef global const T* TrigSingle;
 #endif
 // However, caching weights in nVidia's constant cache improves performance.
 // Even better is to not pollute the constant cache with weights that are used only once.
@@ -148,7 +162,7 @@ typedef global const double2* BigTab;
 #endif
 
 #define KERNEL(x) kernel __attribute__((reqd_work_group_size(x, 1, 1))) void
-
+   
 void read(u32 WG, u32 N, T2 *u, const global T2 *in, u32 base) {
   in += base + (u32) get_local_id(0);
   for (u32 i = 0; i < N; ++i) { u[i] = in[i * WG]; }
@@ -172,7 +186,7 @@ T2 U2(T a, T b) { return (T2) (a, b); }
 #endif
 #endif
 
-OVERLOAD void bar() {
+void OVERLOAD bar(void) {
   // barrier(CLK_LOCAL_MEM_FENCE) is correct, but it turns out that on some GPUs
   // (in particular on Radeon VII and Radeon PRO VII) barrier(0) works as well and is faster.
   // So allow selecting the faster path when it works with -use FAST_BARRIER
@@ -183,7 +197,7 @@ OVERLOAD void bar() {
 #endif
 }
 
-OVERLOAD void bar(u32 WG) { if (WG > WAVEFRONT) { bar(); } }
+void OVERLOAD bar(u32 WG) { if (WG > WAVEFRONT) { bar(); } }
 
 // A half-barrier is only needed when half-a-workgroup needs a barrier.
 // This is used e.g. by the double-wide tailSquare, where LDS is split between the halves.

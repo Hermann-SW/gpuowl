@@ -14,6 +14,9 @@
 #define SINGLE_WIDE             0       // Old single-wide tailSquare vs. new double-wide tailSquare
 #define SINGLE_KERNEL           0       // Implement tailSquare in a single kernel vs. two kernels
 
+#define SAVE_ONE_MORE_WIDTH_MUL  0      // I want to make saving the only option -- but rocm optimizer is inexplicably making it slower in carryfused
+#define SAVE_ONE_MORE_HEIGHT_MUL 1      // In tailSquar this is the fastest option
+
 #define _USE_MATH_DEFINES
 #include <cmath>
 
@@ -90,27 +93,142 @@ double2 root1(u32 N, u32 k) {
   }
 }
 
+// Epsilon value, 2^-250, should have an exact representation as a double.  Used to avoid divide-by-zero in root1over.
+const double epsilon = 5.5271478752604445602472651921923E-76;  // Protect against divide by zero
+
+// Returns the primitive root of unity of order N, to the power k.  Returned format is cosine, sine/cosine.
+double2 root1over(u32 N, u32 k) {
+  assert(k < N);
+
+  long double angle = M_PIl * k / (N / 2);
+  double c = cos(angle);
+  long double s = sinl(angle);
+
+  if (c > -1.0e-15 && c < 1.0e-15) c = epsilon;
+  s = s / c;
+  return {c, double(s)};
+}
+
+// Returns the primitive root of unity of order N, to the power k.  Returns only the cosine value.
+double root1cos(u32 N, u32 k) {
+  assert(k < N);
+
+  long double angle = M_PIl * k / (N / 2);
+  double c = cos(angle);
+
+  if (c > -1.0e-15 && c < 1.0e-15) c = epsilon;
+  return c;
+}
+
+// Returns the primitive root of unity of order N, to the power k.  Returns only the cosine value divided by another cosine value.
+double root1cosover(u32 N, u32 k, double over) {
+  assert(k < N);
+
+  long double angle = M_PIl * k / (N / 2);
+  long double c = cosl(angle);
+
+  if (c > -1.0e-15 && c < 1.0e-15) c = epsilon;
+  return double(c / over);
+}
+
 namespace {
 static const constexpr bool LOG_TRIG_ALLOC = false;
 
+// Interleave two lines of trig values so that AMD GPUs can use global_load_dwordx4 instructions
+void T2shuffle(u32 size, u32 radix, u32 line, vector<double> &tab) {
+  vector<double> line1, line2;
+  u32 line_size = size / radix;
+  for (u32 col = 0; col < line_size; ++col) {
+    line1.push_back(tab[line*line_size + col]);
+    line2.push_back(tab[(line+1)*line_size + col]);
+  }
+  for (u32 col = 0; col < line_size; ++col) {
+    tab[line*line_size + 2*col] = line1[col];
+    tab[line*line_size + 2*col + 1] = line2[col];
+  }
+}
+
 vector<double2> genSmallTrig(u32 size, u32 radix) {
   if (LOG_TRIG_ALLOC) { log("genSmallTrig(%u, %u)\n", size, radix); }
-
+  u32 WG = size / radix;
   vector<double2> tab;
-#if 1
+
+// old fft_WIDTH and fft_HEIGHT
   for (u32 line = 1; line < radix; ++line) {
-    for (u32 col = 0; col < size / radix; ++col) {
+    for (u32 col = 0; col < WG; ++col) {
       tab.push_back(radix / line >= 8 ? root1Fancy(size, col * line) : root1(size, col * line));
     }
   }
   tab.resize(size);
-#else
-  tab.resize(size);
-  auto *p = tab.data() + radix;
-  for (u32 w = radix; w < size; w *= radix) { p = smallTrigBlock(w, std::min(radix, size / w), p); }
-  assert(p - tab.data() == size);
-#endif
 
+// New fft_WIDTH and fft_HEIGHT
+// We need two versions of trig values.  One where we save one more mul and one where we don't.
+// In theory, we should always use save one more mul but the rocm optimizer is doing something weird in fft_WIDTH.
+
+  for (u32 save_one_more_mul = 0; save_one_more_mul <= 1; ++save_one_more_mul) {
+    vector<double> tab1;
+    if (save_one_more_mul) tab.resize(3*size);
+
+    // Sine/cosine values for first fft4 or fft8
+    for (u32 line = 1; line < radix; ++line) {
+      for (u32 col = 0; col < WG; ++col) {
+        double2 root = root1over(size, col * line);
+        tab1.push_back(root.second);
+      }
+    }
+
+    // Sine/cosine values for later fft4 or fft8
+    for (u32 line = 0; line < radix; ++line) {
+      for (u32 col = 0; col < WG; col += radix) {
+        double2 root = root1over(size, col * line);
+        tab1.push_back(root.second);
+      }
+    }
+
+    // Cosine values for first fft4 or fft8 (output in post-shufl order)
+//TODO: Examine why when sine is 0.0 cosine is not 1.0 or -1.0 (printf is outputting 0.999... and -0.999...)
+    for (u32 grp = 0; grp < WG; ++grp) {
+      u32 line = grp / (WG/radix);  // Output "line" number, where each line multiplies a different u[i].  There are radix lines.  Each line has WG values.
+      for (u32 col = 0; col < radix; ++col) {
+        double divide_by = 1.0;
+        // Compute cosine3 / cosine1
+        if ((radix == 4 && line == 3) || (radix == 8 && save_one_more_mul && line == 3)) { 
+          divide_by = root1cos(size, col * (grp - 2*(WG/radix)));
+        }
+        // Compute cosine5 / cosine1, cosine6 / cosine2, cosine7 / cosine3
+        if (radix == 8 && ((save_one_more_mul && line == 5) || line == 6 || line == 7)) { 
+          divide_by = root1cos(size, col * (grp - 4*(WG/radix)));
+        }
+        tab1.push_back(root1cosover(size, col * grp, divide_by));
+      }
+    }
+
+    // Cosine values for later fft4 or fft8 (output in post-shufl order).  Similar to cosines above but output every radix-th value.
+    for (u32 grp = 0; grp < radix; ++grp) {
+      for (u32 col = 0; col < WG; col += radix) {
+        u32 line = col / (WG/radix);
+        double divide_by = 1.0;
+        // Compute cosine3 / cosine1
+        if ((radix == 4 && line == 3) || (radix == 8 && save_one_more_mul && line == 3)) { 
+          divide_by = root1cos(size, grp * (col - 2*(WG/radix)));
+        }
+        // Compute cosine5 / cosine1, cosine6 / cosine2, cosine7 / cosine3
+        if (radix == 8 && ((save_one_more_mul && line == 5) || line == 6 || line == 7)) { 
+          divide_by = root1cos(size, grp * (col - 4*(WG/radix)));
+	}
+        tab1.push_back(root1cosover(size, grp * col, divide_by));
+      }
+    }
+
+    // Interleave first fft4 or fft8 trig values for faster AMD GPU access
+    for (u32 i = 0; i < radix-2; i += 2) T2shuffle(size, radix, i, tab1);
+    for (u32 i = radix; i < 2*radix; i += 2) T2shuffle(size, radix, i, tab1);
+
+    // Convert to a vector of double2
+    for (u32 i = 0; i < tab1.size(); i += 2) tab.push_back({tab1[i], tab1[i+1]});
+  }
+
+  tab.resize(5*size);
   return tab;
 }
 
@@ -118,12 +236,8 @@ vector<double2> genSmallTrig(u32 size, u32 radix) {
 vector<double2> genSmallTrigCombo(u32 width, u32 middle, u32 size, u32 radix) {
   if (LOG_TRIG_ALLOC) { log("genSmallTrigCombo(%u, %u)\n", size, radix); }
 
-  vector<double2> tab;
-  for (u32 line = 1; line < radix; ++line) {
-    for (u32 col = 0; col < size / radix; ++col) {
-      tab.push_back(radix / line >= 8 ? root1Fancy(size, col * line) : root1(size, col * line));
-    }
-  }
+  vector<double2> tab = genSmallTrig(size, radix);
+
   // From tailSquare pre-calculate some or all of these:  T2 trig = slowTrig_N(line + H * lowMe, ND / NH * 2);
 #if PREFER_DP_TO_MEM == 2             // No pre-computed trig values
 #elif PREFER_DP_TO_MEM == 1           // best option on a Radeon VII.
@@ -180,7 +294,7 @@ TrigBufCache::~TrigBufCache() = default;
 TrigPtr TrigBufCache::smallTrig(u32 W, u32 nW) {
   lock_guard lock{mut};
   auto& m = small;
-  decay_t<decltype(m)>::key_type key{W, nW};
+  decay_t<decltype(m)>::key_type key{W, nW, 0, 0};
 
   TrigPtr p{};
   auto it = m.find(key);
@@ -192,21 +306,23 @@ TrigPtr TrigBufCache::smallTrig(u32 W, u32 nW) {
   return p;
 }
 
-TrigPtr TrigBufCache::smallTrigCombo(u32 width, u32 middle, u32 W, u32 nW) {
-  lock_guard lock{mut};
-  auto& m = small;
-#if PREFER_DP_TO_MEM == 2             // No pre-computed trig values
-  decay_t<decltype(m)>::key_type key{W, nW};
-#else
-  // Hack so that width 512 and height 512 don't share the same buffer.  Width could share the height buffer since it is a subset of the combo height buffer.
-  decay_t<decltype(m)>::key_type key{W, nW+1};
+TrigPtr TrigBufCache::smallTrigCombo(u32 width, u32 middle, u32 W, u32 nW, u32 variant) {
+#if PREFER_DP_TO_MEM == 2             // No pre-computed trig values.  We might be able to share this trig table with fft_WIDTH
+  return smallTrig(W, nW);
 #endif
 
+  lock_guard lock{mut};
+  auto& m = small;
+  decay_t<decltype(m)>::key_type key1{W, nW, width, middle};
+  // We write the "combo" under two keys, so it can also be retrieved as non-combo by smallTrig()
+  decay_t<decltype(m)>::key_type key2{W, nW, 0, 0};
+
   TrigPtr p{};
-  auto it = m.find(key);
+  auto it = m.find(key1);
   if (it == m.end() || !(p = it->second.lock())) {
     p = make_shared<TrigBuf>(context, genSmallTrigCombo(width, middle, W, nW));
-    m[key] = p;
+    m[key1] = p;
+    m[key2] = p;
     smallCache.add(p);
   }
   return p;

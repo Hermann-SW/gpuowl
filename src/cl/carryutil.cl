@@ -6,17 +6,30 @@
 #if STATS || ROE
 void updateStats(global uint *bufROE, u32 posROE, float roundMax) {
   assert(roundMax >= 0);
-  u32 groupRound = work_group_reduce_max(as_uint(roundMax));
+  // work_group_reduce_max() allocates an additional 256Bytes LDS for a 64lane workgroup, so avoid it.
+  // u32 groupRound = work_group_reduce_max(as_uint(roundMax));
+  // if (get_local_id(0) == 0) { atomic_max(bufROE + posROE, groupRound); }
 
-  if (get_local_id(0) == 0) { atomic_max(bufROE + posROE, groupRound); }
+  // Do the reduction directly over global mem.
+  atomic_max(bufROE + posROE, as_uint(roundMax));
 }
 #endif
 
-#if 0 && HAS_ASM
-i32  lowBits(i32 u, u32 bits) { i32 tmp; __asm("v_bfe_i32 %0, %1, 0, %2" : "=v" (tmp) : "v" (u), "v" (bits)); return tmp; }
-i32 xtract32(i64 x, u32 bits) { i32 tmp; __asm("v_alignbit_b32 %0, %1, %2, %3" : "=v"(tmp) : "v"(as_int2(x).y), "v"(as_int2(x).x), "v"(bits)); return tmp; }
+#if defined(__has_builtin) && __has_builtin(__builtin_amdgcn_sbfe)
+i32 lowBits(i32 u, u32 bits) { return __builtin_amdgcn_sbfe(u, 0, bits); }
 #else
-i32  lowBits(i32 u, u32 bits) { return ((u << (32 - bits)) >> (32 - bits)); }
+i32 lowBits(i32 u, u32 bits) { return ((u << (32 - bits)) >> (32 - bits)); }
+#endif
+
+#if defined(__has_builtin) && __has_builtin(__builtin_amdgcn_ubfe)
+i32 ulowBits(i32 u, u32 bits) { return __builtin_amdgcn_ubfe(u, 0, bits); }
+#else
+i32 ulowBits(i32 u, u32 bits) { u32 uu = (u32) u; return ((uu << (32 - bits)) >> (32 - bits)); }
+#endif
+
+#if defined(__has_builtin) && __has_builtin(__builtin_amdgcn_alignbit)
+i32 xtract32(i64 x, u32 bits) { return __builtin_amdgcn_alignbit(as_int2(x).y, as_int2(x).x, bits); }
+#else
 i32 xtract32(i64 x, u32 bits) { return x >> bits; }
 #endif
 
@@ -57,6 +70,41 @@ i64 RNDVALdoubleToLong(double d) {
   return as_long(words);
 }
 
+// Apply inverse weight, add in optional carry, calculate roundoff error, convert to integer. Handle MUL3.
+i64 weightAndCarryOne(T u, T invWeight, i64 inCarry, float* maxROE, int sloppy_result_is_acceptable) {
+
+#if !MUL3
+
+  // Convert carry into RNDVAL + carry.
+  int2 tmp = as_int2(inCarry); tmp.y += as_int2(RNDVAL).y;
+  double RNDVALCarry = as_double(tmp);
+
+  // Apply inverse weight and RNDVAL+carry
+  double d = fma(u, invWeight, RNDVALCarry);
+
+  // Optionally calculate roundoff error
+  float roundoff = fabs((float) fma(u, -invWeight, d - RNDVALCarry));
+  *maxROE = max(*maxROE, roundoff);
+
+  // Convert to long (for CARRY32 case we don't need to strip off the RNDVAL bits)
+  if (sloppy_result_is_acceptable) return as_long(d);
+  else return RNDVALdoubleToLong(d);
+
+#else  // We cannot add in the carry until after the mul by 3
+
+  // Apply inverse weight and RNDVAL
+  double d = fma(u, invWeight, RNDVAL);
+
+  // Optionally calculate roundoff error
+  float roundoff = fabs((float) fma(u, -invWeight, d - RNDVAL));
+  *maxROE = max(*maxROE, roundoff);
+
+  // Convert to long, mul by 3, and add carry
+  return RNDVALdoubleToLong(d) * 3 + inCarry;
+
+#endif
+}
+
 Word OVERLOAD carryStep(i64 x, i64 *outCarry, bool isBigWord) {
   u32 nBits = bitlen(isBigWord);
   Word w = lowBits(x, nBits);
@@ -76,6 +124,27 @@ Word OVERLOAD carryStep(i32 x, i32 *outCarry, bool isBigWord) {
   u32 nBits = bitlen(isBigWord);
   Word w = lowBits(x, nBits);
   *outCarry = (x - w) >> nBits;
+  return w;
+}
+
+Word OVERLOAD carryStepSloppy(i64 x, i64 *outCarry, bool isBigWord) {
+  u32 nBits = bitlen(isBigWord);
+  Word w = ulowBits(x, nBits);
+  *outCarry = x >> nBits;
+  return w;
+}
+
+Word OVERLOAD carryStepSloppy(i64 x, i32 *outCarry, bool isBigWord) {
+  u32 nBits = bitlen(isBigWord);
+  Word w = ulowBits(x, nBits);
+  *outCarry = xtract32(x, nBits);
+  return w;
+}
+
+Word OVERLOAD carryStepSloppy(i32 x, i32 *outCarry, bool isBigWord) {
+  u32 nBits = bitlen(isBigWord);
+  Word w = ulowBits(x, nBits);
+  *outCarry = x >> nBits;
   return w;
 }
 
@@ -108,3 +177,4 @@ Word2 carryWord(Word2 a, CarryABM* carry, bool b1, bool b2) {
   a.y = carryStep(a.y + *carry, carry, b2);
   return a;
 }
+

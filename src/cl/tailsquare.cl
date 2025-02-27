@@ -26,16 +26,17 @@ void onePairSq(T2* pa, T2* pb, T2 conjugate_t_squared) {
   T2 a = *pa;
   T2 b = *pb;
 
+//  X2conjb(a, b);
+//  *pb = mul2(cmul(a, b));
+//  *pa = csqa(a, cmul(csq(b), conjugate_t_squared));
+//  X2conja(*pa, *pb);
+
+  // Less readable version of the above that saves one complex add by using FMA instructions
   X2conjb(a, b);
-
-  T2 tmp = a;
-  a = csqa(a, cmul(csq(b), conjugate_t_squared));
-  b = 2 * cmul(tmp, b);
-
-  X2conja(a, b);
-
-  *pa = a;
-  *pb = b;
+  T2 minusnewb = mulminus2(cmul(a, b));                          // -newb = -2ab
+  *pb = csqa(a, cfma(csq(b), conjugate_t_squared, minusnewb));   // final b = newa - newb = a^2 + (bt')^2 - newb
+  (*pa).x = fma(-2.0, minusnewb.x, (*pb).x);                     // final a = newa + newb = finalb + 2 * newb
+  (*pa).y = fma(2.0, minusnewb.y, -(*pb).y);                     // conjugate(final a)
 }
 
 void pairSq(u32 N, T2 *u, T2 *v, T2 base_squared, bool special) {
@@ -134,9 +135,9 @@ KERNEL(G_H) tailSquare(P(T2) out, CP(T2) in, Trig smallTrig) {
 
   // Do a little bit of memory access and a little bit of DP math.  Good on a Radeon VII.
 #elif PREFER_DP_TO_MEM == 1
-  // Calculate number of trig values used by fft_HEIGHT.
+  // Calculate number of trig values used by fft_HEIGHT (see genSmallTrigCombo in trigBufCache.cpp)
   // The trig values used here are pre-computed and stored after the fft_HEIGHT trig values.
-  u32 height_trigs = SMALL_HEIGHT/NH*(NH-1);
+  u32 height_trigs = SMALL_HEIGHT*5;
   // Read a hopefully cached line of data and one non-cached T2 per line
   T2 trig = smallTrig[height_trigs + me];                    // Trig values for line zero, should be cached
   T2 mult = smallTrig[height_trigs + G_H + line1];           // Line multiplier
@@ -144,9 +145,9 @@ KERNEL(G_H) tailSquare(P(T2) out, CP(T2) in, Trig smallTrig) {
 
   // On consumer-grade GPUs, it is likely beneficial to read all trig values.
 #else
-  // Calculate number of trig values used by fft_HEIGHT.
+  // Calculate number of trig values used by fft_HEIGHT (see genSmallTrigCombo in trigBufCache.cpp)
   // The trig values used here are pre-computed and stored after the fft_HEIGHT trig values.
-  u32 height_trigs = SMALL_HEIGHT/NH*(NH-1);
+  u32 height_trigs = SMALL_HEIGHT*5;
   // Read pre-computed trig values
   T2 trig = NTLOAD(smallTrig[height_trigs + line1*G_H + me]);
 #endif
@@ -219,11 +220,11 @@ KERNEL(G_H * 2) tailSquare(P(T2) out, CP(T2) in, Trig smallTrig) {
   u32 line_u = get_group_id(0) + 1;
   u32 line_v = H - line_u;
 #endif
-  
+
   u32 me = get_local_id(0);
   u32 lowMe = me % G_H;  // lane-id in one of the two halves (half-workgroups).
   
-  // It's not clear where up/down is, so we're going to call the halves "first-half" and "second-half".
+  // We're going to call the halves "first-half" and "second-half".
   bool isSecondHalf = me >= G_H;
   
   u32 line = !isSecondHalf ? line_u : line_v;
@@ -237,7 +238,7 @@ KERNEL(G_H * 2) tailSquare(P(T2) out, CP(T2) in, Trig smallTrig) {
   T2 w = slowTrig_N(H * lowMe, ND / NH);
 #endif
 
-  fft_HEIGHT2(lds, u, smallTrig, w);
+  new_fft_HEIGHT2_1(lds, u, smallTrig, w);
 
   // Compute trig value from scratch.  Good on GPUs with high DP throughput.
 #if PREFER_DP_TO_MEM >= 2
@@ -245,9 +246,9 @@ KERNEL(G_H * 2) tailSquare(P(T2) out, CP(T2) in, Trig smallTrig) {
 
   // Do a little bit of memory access and a little bit of DP math.  Good on a Radeon VII.
 #elif PREFER_DP_TO_MEM == 1
-  // Calculate number of trig values used by fft_HEIGHT.
+  // Calculate number of trig values used by fft_HEIGHT (see genSmallTrigCombo in trigBufCache.cpp)
   // The trig values used here are pre-computed and stored after the fft_HEIGHT trig values.
-  u32 height_trigs = SMALL_HEIGHT/NH*(NH-1);
+  u32 height_trigs = SMALL_HEIGHT*5;
   // Read a hopefully cached line of data and one non-cached T2 per line
   T2 trig = smallTrig[height_trigs + lowMe];                                 // Trig values for line zero, should be cached
   T2 mult = smallTrig[height_trigs + G_H + line_u*2 + isSecondHalf];         // Two multipliers.  One for line u, one for line v.
@@ -255,9 +256,9 @@ KERNEL(G_H * 2) tailSquare(P(T2) out, CP(T2) in, Trig smallTrig) {
 
   // On consumer-grade GPUs, it is likely beneficial to read all trig values.
 #else
-  // Calculate number of trig values used by fft_HEIGHT.
+  // Calculate number of trig values used by fft_HEIGHT (see genSmallTrigCombo in trigBufCache.cpp)
   // The trig values used here are pre-computed and stored after the fft_HEIGHT trig values.
-  u32 height_trigs = SMALL_HEIGHT/NH*(NH-1);
+  u32 height_trigs = SMALL_HEIGHT*5;
   // Read pre-computed trig values
   T2 trig = NTLOAD(smallTrig[height_trigs + line_u*G_H*2 + me]);
 #endif
@@ -285,7 +286,7 @@ KERNEL(G_H * 2) tailSquare(P(T2) out, CP(T2) in, Trig smallTrig) {
 
   bar(G_H);
 
-  fft_HEIGHT2(lds, u, smallTrig, w);
+  new_fft_HEIGHT2_2(lds, u, smallTrig, w);
 
   // Write lines u and v
   writeTailFusedLine(u, out, transPos(line, MIDDLE, WIDTH), lowMe);

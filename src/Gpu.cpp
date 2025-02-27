@@ -213,7 +213,9 @@ string clDefines(const Args& args, cl_device_id id, FFTConfig fft, const vector<
                               "DEBUG",
                               "CARRY64",
                               "BCAST",
-                              "BIGLIT"
+                              "BIGLIT",
+                              "NONTEMPORAL",
+                              "PAD"
                             });
     if (!isValid) {
       log("Warning: unrecognized -use key '%s'\n", k.c_str());
@@ -242,8 +244,8 @@ string clDefines(const Args& args, cl_device_id id, FFTConfig fft, const vector<
 
   u32 N = fft.shape.size();
 
-  defines += toDefine("WEIGHT_STEP", double(weight(N, E, fft.shape.height * fft.shape.middle, 0, 0, 1) - 1));
-  defines += toDefine("IWEIGHT_STEP", double(invWeight(N, E, fft.shape.height * fft.shape.middle, 0, 0, 1) - 1));
+  defines += toDefine("WEIGHT_STEP", weightM1(N, E, fft.shape.height * fft.shape.middle, 0, 0, 1));
+  defines += toDefine("IWEIGHT_STEP", invWeightM1(N, E, fft.shape.height * fft.shape.middle, 0, 0, 1));
   defines += toDefine("FFT_VARIANT", fft.variant);
   defines += toDefine("TAILT", root1Fancy(fft.shape.height * 2, 1));
 
@@ -448,7 +450,7 @@ Gpu::Gpu(Queue* q, GpuCommon shared, FFTConfig fft, u32 E, const vector<KeyVal>&
 #undef K
 
   bufTrigW{shared.bufCache->smallTrig(WIDTH, nW)},
-  bufTrigH{shared.bufCache->smallTrigCombo(WIDTH, fft.shape.middle, SMALL_H, nH)},
+  bufTrigH{shared.bufCache->smallTrigCombo(WIDTH, fft.shape.middle, SMALL_H, nH, fft.variant)},
   bufTrigM{shared.bufCache->middleTrig(SMALL_H, BIG_H / SMALL_H, WIDTH)},
 
   weights{genWeights(E, WIDTH, BIG_H, nW, isAmdGpu(q->context->deviceId()))},
@@ -475,7 +477,7 @@ Gpu::Gpu(Queue* q, GpuCommon shared, FFTConfig fft, u32 E, const vector<KeyVal>&
   BUF(bufROE, ROE_SIZE),
   BUF(bufStatsCarry, CARRY_SIZE),
 
-  BUF(buf1, N + N/4),		// Let's us play with padding instead of rotating.  Need to calculate actual cost of padding
+  BUF(buf1, N + N/4),           // Let's us play with padding instead of rotating.  Need to calculate actual cost of padding
   BUF(buf2, N + N/4),
   BUF(buf3, N + N/4),
 #undef BUF

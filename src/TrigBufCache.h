@@ -27,13 +27,13 @@ class TrigBufCache {
   const Context* context;
   std::mutex mut;
 
-  std::map<tuple<u32, u32>, TrigPtr::weak_type> small;
+  std::map<tuple<u32, u32, u32, u32>, TrigPtr::weak_type> small;
   std::map<tuple<u32, u32, u32>, TrigPtr::weak_type> middle;
 
   // The shared-pointers below keep the most recent set of buffers alive even without any Gpu instance
   // referencing them. This allows a single worker to delete & re-create the Gpu instance and still reuse the buffers.
-  StrongCache smallCache{6};
-  StrongCache middleCache{6};
+  StrongCache smallCache{4};
+  StrongCache middleCache{4};
 
 public:
   TrigBufCache(const Context* context) :
@@ -43,7 +43,7 @@ public:
   ~TrigBufCache();
 
   TrigPtr smallTrig(u32 W, u32 nW);
-  TrigPtr smallTrigCombo(u32 width, u32 middle, u32 W, u32 nW);
+  TrigPtr smallTrigCombo(u32 width, u32 middle, u32 W, u32 nW, u32 variant);
   TrigPtr middleTrig(u32 SMALL_H, u32 MIDDLE, u32 W);
 };
 

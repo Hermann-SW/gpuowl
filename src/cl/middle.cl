@@ -16,20 +16,30 @@
 #define OUT_SIZEX 16
 #endif
 
-// Parameters we may want to let user tune.  WIDTH other than 512 and 1K is untested.  SMALL_HEIGHT other than 256 and 512 is untested.
+// Let user control whether padding is enabled with -use PAD=0 or -use PAD=1.
+// The default is padding is on for AMD GPUs and off for others.
+// I do not know the correct setting for Intel BattleMage and I only have data on one nVidia GPU - the Titan V.
+#if !defined(PAD)
 #if AMDGPU
+#define PAD  1
+#else
+#define PAD  0
+#endif
+#endif
+   
+// Padding parameters we may want to let user tune.  WIDTH other than 512 and 1K is untested.  SMALL_HEIGHT other than 256 and 512 is untested.
+#if PAD
 #define PADDING 1                                       // Prefer padding to avoid bad strides
 #define MIDDLE_IN_LDS_TRANSPOSE (IN_WG >= 128)          // Radeon VII likes LDS transpose for larger workgroups
 #define MIDDLE_OUT_LDS_TRANSPOSE (OUT_WG >= 128)        // Radeon VII likes LDS transpose for larger workgroups
 #define PAD_SIZE 16                                     // Radeon VII likes 16 T2 values = 256 bytes 
-#endif
 
-// nVidia Titan V see no padding benefit, likes LDS transposes
-#if !AMDGPU
+// nVidia Titan V sees no padding benefit, likes LDS transposes
+#else
 #define PADDING 0                                       // Don't prefer padding to avoid bad strides
 #define MIDDLE_IN_LDS_TRANSPOSE 1                       // nVidia likes LDS transpose
 #define MIDDLE_OUT_LDS_TRANSPOSE 1                      // nVidia likes LDS transpose
-#define PAD_SIZE 8                                      // nVidia documentation indicates 8 T2 values = 128 bytes should be best
+#define PAD_SIZE 8                                      // nVidia documentation indicates 8 T2 values = 128 bytes ought to be best if we ever turn padding on
 #endif
 
 //****************************************************************************************
@@ -136,12 +146,17 @@ void readTailFusedLine(CP(T2) in, T2 *u, u32 line, u32 me) {
   u32 fftMiddleIn_i = line / WIDTH;                             // The i in fftMiddleIn's u[i]
   in += fftMiddleIn_i * IN_WG;                                  // Adjust in pointer the same way writeMiddleInLine did
 
-  // Adjust in pointer based on the y value used in writeMiddleInLine
+  // Adjust in pointer based on the y value used in writeMiddleInLine.  This code is a little obscure as rocm compiler has trouble optimizing commented out code.
   in += me % SIZEY;                                             // Adjust in pointer to read SIZEY consecutive values
+  u32 fftMiddleIn_y = me;                                       // The i=0 fftMiddleIn y value
+  u32 chunk_y = fftMiddleIn_y / SIZEY;                          // The i=0 fftMiddleIn chunk_y value
+  u32 fftMiddleIn_y_incr = G_H;                                 // The increment to next fftMiddleIn y value
+  u32 chunk_y_incr = fftMiddleIn_y_incr / SIZEY;                // The increment to next fftMiddleIn chunk_y value
   for (i32 i = 0; i < NH; ++i) {
-    u32 fftMiddleIn_y = i * G_H + me;                           // The fftMiddleIn y value
-    u32 chunk_y = fftMiddleIn_y / SIZEY;                        // The fftMiddleIn chunk_y value
+//    u32 fftMiddleIn_y = i * G_H + me;                           // The fftMiddleIn y value
+//    u32 chunk_y = fftMiddleIn_y / SIZEY;                        // The fftMiddleIn chunk_y value
     u[i] = NTLOAD(in[chunk_y * (MIDDLE * IN_WG + PAD_SIZE)]);   // Adjust in pointer the same way writeMiddleInLine did
+    chunk_y += chunk_y_incr;
   }
 
 #else                                                           // Read data that was not rotated or padded
@@ -157,12 +172,17 @@ void readTailFusedLine(CP(T2) in, T2 *u, u32 line, u32 me) {
   u32 fftMiddleIn_i = line / WIDTH;                             // The i in fftMiddleIn's u[i]
   in += fftMiddleIn_i * IN_WG;                                  // Adjust in pointer the same way writeMiddleInLine did
 
-  // Adjust in pointer based on the y value used in writeMiddleInLine
+  // Adjust in pointer based on the y value used in writeMiddleInLine.  This code is a little obscure as rocm compiler has trouble optimizing commented out code.
   in += me % SIZEY;                                             // Adjust in pointer to read SIZEY consecutive values
+  u32 fftMiddleIn_y = me;                                       // The i=0 fftMiddleIn y value
+  u32 chunk_y = fftMiddleIn_y / SIZEY;                          // The i=0 fftMiddleIn chunk_y value
+  u32 fftMiddleIn_y_incr = G_H;                                 // The increment to next fftMiddleIn y value
+  u32 chunk_y_incr = fftMiddleIn_y_incr / SIZEY;                // The increment to next fftMiddleIn chunk_y value
   for (i32 i = 0; i < NH; ++i) {
     u32 fftMiddleIn_y = i * G_H + me;                           // The fftMiddleIn y value
     u32 chunk_y = fftMiddleIn_y / SIZEY;                        // The fftMiddleIn chunk_y value
     u[i] = NTLOAD(in[chunk_y * (MIDDLE * IN_WG)]);              // Adjust in pointer the same way writeMiddleInLine did
+    chunk_y += chunk_y_incr;
   }
 
 #endif
@@ -313,12 +333,17 @@ void readCarryFusedLine(CP(T2) in, T2 *u, u32 line) {
   u32 fftMiddleOut_i = line / SMALL_HEIGHT;                     // The i in fftMiddleOut's u[i]
   in += fftMiddleOut_i * OUT_WG;                                // Adjust in pointer the same way writeMiddleOutLine did
 
-  // Adjust in pointer based on the y value used in writeMiddleOutLine
+  // Adjust in pointer based on the y value used in writeMiddleOutLine.  This code is a little obscure as rocm compiler has trouble optimizing commented out code.
   in += me % SIZEY;                                             // Adjust in pointer to read SIZEY consecutive values
+  u32 fftMiddleOut_y = me;                                      // The i=0 fftMiddleOut y value
+  u32 chunk_y = fftMiddleOut_y / SIZEY;                         // The i=0 fftMiddleOut chunk_y value
+  u32 fftMiddleOut_y_incr = G_W;                                // The increment to next fftMiddleOut y value
+  u32 chunk_y_incr = fftMiddleOut_y_incr / SIZEY;               // The increment to next fftMiddleOut chunk_y value
   for (i32 i = 0; i < NW; ++i) {
-    u32 fftMiddleOut_y = i * G_W + me;                          // The fftMiddleOut y value
-    u32 chunk_y = fftMiddleOut_y / SIZEY;                       // The fftMiddleOut chunk_y value
+//    u32 fftMiddleOut_y = i * G_W + me;                          // The fftMiddleOut y value
+//    u32 chunk_y = fftMiddleOut_y / SIZEY;                       // The fftMiddleOut chunk_y value
     u[i] = NTLOAD(in[chunk_y * (MIDDLE * OUT_WG + PAD_SIZE)]);  // Adjust in pointer the same way writeMiddleOutLine did
+    chunk_y += chunk_y_incr;
   }
 
 #else                                                           // Read data that was not rotated or padded
@@ -334,12 +359,17 @@ void readCarryFusedLine(CP(T2) in, T2 *u, u32 line) {
   u32 fftMiddleOut_i = line / SMALL_HEIGHT;                     // The i in fftMiddleOut's u[i]
   in += fftMiddleOut_i * OUT_WG;                                // Adjust in pointer the same way writeMiddleOutLine did
 
-  // Adjust in pointer based on the y value used in writeMiddleOutLine
+  // Adjust in pointer based on the y value used in writeMiddleOutLine.  This code is a little obscure as rocm compiler has trouble optimizing commented out code.
   in += me % SIZEY;                                             // Adjust in pointer to read SIZEY consecutive values
+  u32 fftMiddleOut_y = me;                                      // The i=0 fftMiddleOut y value
+  u32 chunk_y = fftMiddleOut_y / SIZEY;                         // The i=0 fftMiddleOut chunk_y value
+  u32 fftMiddleOut_y_incr = G_W;                                // The increment to next fftMiddleOut y value
+  u32 chunk_y_incr = fftMiddleOut_y_incr / SIZEY;               // The increment to next fftMiddleOut chunk_y value
   for (i32 i = 0; i < NW; ++i) {
-    u32 fftMiddleOut_y = i * G_W + me;                          // The fftMiddleOut y value
-    u32 chunk_y = fftMiddleOut_y / SIZEY;                       // The fftMiddleOut chunk_y value
+//    u32 fftMiddleOut_y = i * G_W + me;                          // The fftMiddleOut y value
+//    u32 chunk_y = fftMiddleOut_y / SIZEY;                       // The fftMiddleOut chunk_y value
     u[i] = NTLOAD(in[chunk_y * MIDDLE * OUT_WG]);               // Adjust in pointer the same way writeMiddleOutLine did
+    chunk_y += chunk_y_incr;
   }
 
 #endif
