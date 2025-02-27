@@ -1,3 +1,63 @@
+## Immense potential of genFerOwL branch
+
+- factor 3.5× for only comparing geneferg and prpll runtimes on similar size primes
+- but the number of loops for genFerOwL branch is 24036583/1048576=22.9× smaller as well
+- can ETA of 1:02h/22.9=2:42min for <kbd>3843236^1048576+1</kbd> be real?
+  (would be 79.6× speedup ...)
+
+
+From t5k.org:
+```
+...
+   17  2^24036583-1                     7235733 G7    2004 Mersenne 41
+   18  107347*2^23427517-1              7052391 A2    2024 
+   19c 3843236^1048576+1                6904556 L6094 2024 Generalized Fermat
+...
+```
+
+Runtimes computed on:
+```
+hermann@7600x:~/gpuowl$ clinfo | grep Inst
+  Device Board Name (AMD)                         AMD Instinct MI50/MI60
+hermann@7600x:~/gpuowl$ 
+```
+
+(2:35min+0:59h=)1:02h ETA for M_41
+```
+hermann@7600x:~/gpuowl$ build-release/prpll-amd 
+20250227 15:40:56  PRPLL de44a09 starting
+20250227 15:40:56  device 0, OpenCL 3635.0 (HSA1.1,LC), unique id 'd64a58a17330f0ed'
+20250227 15:40:57 24036583 config: 
+20250227 15:40:57 24036583 FFT: 1.25M 512:5:256:0:0 (18.34 bpw)
+20250227 15:40:58 24036583 OK         0 on-load: blockSize 1000, 0000000000000003
+20250227 15:40:58 24036583 Proof of power 9 requires about 1.5GB of disk space
+20250227 15:40:59 24036583 OK      2000 3cb2d899b8b75158  266 ETA 01:46; Z=64 (avg 63.5)
+20250227 15:41:02 24036583        20000 f3c44af4cfadbfe0  152
+...
+20250227 15:43:28 24036583       980000 b2ebc6858bf43b89  153
+20250227 15:43:31 24036583 OK   1000000 b82646bde57db8fc  153 ETA 00:59; Z=64 (avg 63.6)
+20250227 15:43:35 24036583      1020000 b50870c6e109d398  152
+20250227 15:43:38 24036583      1040000 13f32c02115b74eb  153
+```
+
+3:35h ETA for slightly smaller generalized Fermat prime "3843236^1048576+1"
+```
+hermann@7600x:~/genefer22/bin$ ./geneferg -q -n 20 -b 3843236
+geneferg version 24.04.1 (linux x64, gcc-13.3.0)
+Copyright (c) 2022, Yves Gallot
+genefer is free source code, under the MIT license.
+
+Command line: '-q -n 20 -b 3843236'
+
+Running on device 'gfx906:sramecc+:xnack-', vendor 'Advanced Micro Devices, Inc.', version 'OpenCL 2.0 ', driver '3635.0 (HSA1.1,LC)', data size: 36 MB.
+0.0778% done, 03:35:37 remaining, 0.564 ms/bit.        
+0.163% done, 03:34:02 remaining, 0.561 ms/bit.        
+3843236^{2^20} + 1: terminated.                   
+
+hermann@7600x:~/genefer22/bin$ 
+
+```
+
 [![Actions Status](https://github.com/preda/gpuowl/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/preda/gpuowl/actions/workflows/ci.yml)
 
 ## Must read papers
