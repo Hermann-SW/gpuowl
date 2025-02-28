@@ -1,7 +1,11 @@
+## mission statement
+
+genFerOwL branch should make <kbd>prpll</kbd> process generalized Fermat numbers instead of Mersenne numbers
+
 ## Immense potential of genFerOwL branch
 
-- factor 3.5× for only comparing geneferg and prpll runtimes on similar size primes
-- but the number of loops for genFerOwL branch is 24036583/1048576=22.9× smaller as well
+- factor 3.5× for only comparing <kbd>geneferg</kbd> and <kbd>prpll</kbd> (GPU) runtimes on similar size primes
+- but the number of loops for example on genFerOwL branch is (24036583/1048576=)22.9× smaller as well
 - can ETA of 1:02h/22.9=2:42min for <kbd>3843236^1048576+1</kbd> be real?
   (would be 79.6× speedup ...)
 
@@ -57,6 +61,21 @@ Running on device 'gfx906:sramecc+:xnack-', vendor 'Advanced Micro Devices, Inc.
 hermann@7600x:~/genefer22/bin$ 
 
 ```
+
+## now possible to process numbers with as low as 118,371 decimal digits
+
+<kbd>prpll</kbd> PRP test for Mersenne primes  
+- worked for <kbd>2^786432-1</kbd> and higher exponents
+- for exponents below "FFT size too large" exception
+
+Adding <kbd>-fft 256:1:256</kbd> option
+- worked for <kbd>2^393216-1</kbd> and higher exponents
+- for exponents below "FFT size too large" exception
+- warning <kbd>BPW info for 256:1:256 not found</kbd> was logged
+
+Commit [b86e55a](https://github.com/Hermann-SW/gpuowl/commit/b86e55a4e1d1f71bb199a1f44198112c30e64c51) fixed the warning.  
+Still lower than 786432 exponents need <kbd>-fft "256:1:256"</kbd> added to work.  
+So with this option numbers with more than 118,370 decimal digits can be processed.  
 
 [![Actions Status](https://github.com/preda/gpuowl/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/preda/gpuowl/actions/workflows/ci.yml)
 
