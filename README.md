@@ -12,9 +12,11 @@ genFerOwL branch should make <kbd>prpll</kbd> process generalized Fermat numbers
 
 From t5k.org:
 ```
+ rank  description                     digits   who   year comment
+-----  ------------------------------- -------- ----- ---- --------------
 ...
    17  2^24036583-1                     7235733 G7    2004 Mersenne 41
-   18  107347*2^23427517-1              7052391 A2    2024 
+...
    19c 3843236^1048576+1                6904556 L6094 2024 Generalized Fermat
 ...
 ```
