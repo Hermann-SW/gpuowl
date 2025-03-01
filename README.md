@@ -8,6 +8,8 @@ prothOwL branch should make <kbd>prpll</kbd> process Proth numbers instead of Me
 
 From t5k.org:
 ```
+ rank  description                     digits   who   year comment
+-----  ------------------------------- -------- ----- ---- --------------
 ...
    23  202705*2^21320516+1              6418121 L5181 2021 
    24  2^20996011-1                     6320430 G6    2003 Mersenne 40
