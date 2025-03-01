@@ -1,21 +1,16 @@
 ## mission statement
 
-genFerOwL branch should make <kbd>prpll</kbd> process generalized Fermat numbers instead of Mersenne numbers
+prothOwL branch should make <kbd>prpll</kbd> process Proth numbers instead of Mersenne numbers
 
-## Immense potential of genFerOwL branch
+## potential of prothOwL branch
 
-- factor 3.5× for only comparing <kbd>geneferg</kbd> and <kbd>prpll</kbd> (GPU) runtimes on similar size primes
-- but the number of loops for example on genFerOwL branch is (24036583/1048576=)22.9× smaller as well
-- can ETA of 1:02h/22.9=2:42min for <kbd>3843236^1048576+1</kbd> be real?
-  (would be 79.6× speedup ...)
-
+- factor (10:53h/0:51h=)12.8× for only comparing <kbd>proth20</kbd> and <kbd>prpll</kbd> (GPU) runtimes on similar size primes
 
 From t5k.org:
 ```
 ...
-   17  2^24036583-1                     7235733 G7    2004 Mersenne 41
-   18  107347*2^23427517-1              7052391 A2    2024 
-   19c 3843236^1048576+1                6904556 L6094 2024 Generalized Fermat
+   23  202705*2^21320516+1              6418121 L5181 2021 
+   24  2^20996011-1                     6320430 G6    2003 Mersenne 40
 ...
 ```
 
@@ -26,40 +21,48 @@ hermann@7600x:~/gpuowl$ clinfo | grep Inst
 hermann@7600x:~/gpuowl$ 
 ```
 
-(2:35min+0:59h=)1:02h ETA for M_41
+0:51h ETA for M_40
 ```
 hermann@7600x:~/gpuowl$ build-release/prpll-amd 
-20250227 15:40:56  PRPLL de44a09 starting
-20250227 15:40:56  device 0, OpenCL 3635.0 (HSA1.1,LC), unique id 'd64a58a17330f0ed'
-20250227 15:40:57 24036583 config: 
-20250227 15:40:57 24036583 FFT: 1.25M 512:5:256:0:0 (18.34 bpw)
-20250227 15:40:58 24036583 OK         0 on-load: blockSize 1000, 0000000000000003
-20250227 15:40:58 24036583 Proof of power 9 requires about 1.5GB of disk space
-20250227 15:40:59 24036583 OK      2000 3cb2d899b8b75158  266 ETA 01:46; Z=64 (avg 63.5)
-20250227 15:41:02 24036583        20000 f3c44af4cfadbfe0  152
-...
-20250227 15:43:28 24036583       980000 b2ebc6858bf43b89  153
-20250227 15:43:31 24036583 OK   1000000 b82646bde57db8fc  153 ETA 00:59; Z=64 (avg 63.6)
-20250227 15:43:35 24036583      1020000 b50870c6e109d398  152
-20250227 15:43:38 24036583      1040000 13f32c02115b74eb  153
+20250301 10:35:54  PRPLL de44a09 starting
+20250301 10:35:54  device 0, OpenCL 3635.0 (HSA1.1,LC), unique id 'd64a58a17330f0ed'
+20250301 10:35:54 20996011 config: 
+20250301 10:35:54 20996011 FFT: 1152K 256:9:256:2:0 (17.80 bpw)
+20250301 10:35:56 20996011 OK         0 on-load: blockSize 1000, 0000000000000003
+20250301 10:35:56 20996011 Proof of power 9 requires about 1.3GB of disk space
+20250301 10:35:56 20996011 OK      2000 9383c48226b1e7b8  241 ETA 01:24; Z=172 (avg 171.8)
+20250301 10:35:59 20996011        20000 0cd9c21d8fb4b0d4  143
+20250301 10:36:02 20996011        40000 47650baaf967e4ea  144
+20250301 10:36:05 20996011        60000 a55c4cde3e20beda  144
+20250301 10:36:08 20996011        80000 f5e949a36a5e0140  144
+20250301 10:36:11 20996011       100000 f3b0103027fcc59b  144
+^C20250301 10:36:12 20996011 Stopping, please wait..
+20250301 10:36:12 20996011 OK    108000 6623973f1fcd074d  144 ETA 00:50; Z=182 (avg 173.5)
+20250301 10:36:12  Exception "stop requested"
+20250301 10:36:12  Bye
+hermann@7600x:~/gpuowl$ 
 ```
 
-3:35h ETA for slightly smaller generalized Fermat prime "3843236^1048576+1"
+10:53h ETA for slightly bigger Proth prime "202705*2^21320516+1"
 ```
-hermann@7600x:~/genefer22/bin$ ./geneferg -q -n 20 -b 3843236
-geneferg version 24.04.1 (linux x64, gcc-13.3.0)
-Copyright (c) 2022, Yves Gallot
-genefer is free source code, under the MIT license.
+hermann@7600x:~/proth20/bin$ ./proth20 -q "202705*2^21320516+1"
+proth20 0.9.1 linux64 gcc-11.4.0
+Copyright (c) 2020, Yves Gallot
+proth20 is free source code, under the MIT license.
 
-Command line: '-q -n 20 -b 3843236'
+0 - device 'gfx906:sramecc+:xnack-', vendor 'Advanced Micro Devices, Inc.', platform 'AMD Accelerated Parallel Processing'.
+1 - device 'gfx1036', vendor 'Advanced Micro Devices, Inc.', platform 'AMD Accelerated Parallel Processing'.
 
-Running on device 'gfx906:sramecc+:xnack-', vendor 'Advanced Micro Devices, Inc.', version 'OpenCL 2.0 ', driver '3635.0 (HSA1.1,LC)', data size: 36 MB.
-0.0778% done, 03:35:37 remaining, 0.564 ms/bit.        
-0.163% done, 03:34:02 remaining, 0.561 ms/bit.        
-3843236^{2^20} + 1: terminated.                   
+Running on device 'gfx906:sramecc+:xnack-', vendor 'Advanced Micro Devices, Inc.', version 'OpenCL 2.0 ' and driver '3635.0 (HSA1.1,LC)'.
+60 compUnits @ 1725MHz, mem=16368MB, cache=16kB, cacheLine=64B, localMem=64kB, constMem=14246707kB, maxWorkGroup=256.
 
-hermann@7600x:~/genefer22/bin$ 
-
+Testing 202705 * 2^21320516 + 1, 6418121 digits, size = 2^22 x 19 bits, plan: 64_16 64_16 64_16 sq_16 p2i_16_16
+ 0.011% done, 10:52:45 remaining, 1.84 ms/mul.        
+ 0.022% done, 11:59:59 remaining, 2.03 ms/mul.        
+ 0.033% done, 10:53:03 remaining, 1.84 ms/mul.        
+ 0.044% done, 11:44:59 remaining, 1.98 ms/mul.        
+ 0.055% done, 11:08:37 remaining, 1.88 ms/mul.        
+^Chermann@7600x:~/proth20/bin$
 ```
 
 ## now possible to process numbers with as low as 118,371 decimal digits
