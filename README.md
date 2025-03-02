@@ -2,13 +2,9 @@
 
 genFerOwL branch should make <kbd>prpll</kbd> process generalized Fermat numbers instead of Mersenne numbers
 
-## Immense potential of genFerOwL branch
+## potential of genFerOwL branch
 
 - factor 3.5× for only comparing <kbd>geneferg</kbd> and <kbd>prpll</kbd> (GPU) runtimes on similar size primes
-- but the number of loops for example on genFerOwL branch is (24036583/1048576=)22.9× smaller as well
-- can ETA of 1:02h/22.9=2:42min for <kbd>3843236^1048576+1</kbd> be real?
-  (would be 79.6× speedup ...)
-
 
 From t5k.org:
 ```
