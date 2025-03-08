@@ -158,7 +158,7 @@ double roundNumberScore(u32 x) {
 } // namespace
 
 template<> PRPState Saver<PRPState>::initState() {
-  return {exponent, 0, blockSize, 9, makeWords(exponent, 1), 0, 0};
+  return {exponent, 0, blockSize, 3, makeWords(exponent, 1), 0, 0};
 }
 
 template<> LLState Saver<LLState>::initState() {

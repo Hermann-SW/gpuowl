@@ -34,7 +34,7 @@ private:
     , queue{queue}
     , tInfo{tInfo}
   {}
-public:
+
   void fill(T value, u32 len) {
     assert(len <= size);
     queue->fillBuf(get(), value, (len ? len : size) * sizeof(T), tInfo);
