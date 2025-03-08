@@ -84,6 +84,53 @@ So with this option numbers with more than 118,370 decimal digits can be process
 
 [![Actions Status](https://github.com/preda/gpuowl/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/preda/gpuowl/actions/workflows/ci.yml)
 
+## first modification
+
+With unclean working commit [3faae90](https://github.com/Hermann-SW/gpuowl/commit/3faae90a4af2d9964c387dfdb9e58caa5c2dc402):  
+- start with 9 instead of 3
+- number or squarings reduced by 1
+- proof generation turned off for now
+
+Long run to verify that PRP is determined correctly:  
+```
+hermann@7600x:~/gpuowl$ rm -rf 20996011 && build-release/prpll -prp 20996011 2>err
+20250308 02:06:04  PRPLL 7457abd-dirty starting
+20250308 02:06:04  config: -prp 20996011 
+20250308 02:06:04  device 0, OpenCL 3635.0 (HSA1.1,LC), unique id 'd64a58a17330f0ed'
+20250308 02:06:04 20996011 config: 
+20250308 02:06:04 20996011 FFT: 1152K 256:9:256:2:0 (17.80 bpw)
+bufData: 0 0 0 0 0 0 0 0 0 0  ...
+bufData: 0 0 0 0 0 0 0 0 0 0  ...
+w bufData: 0 0 0 0 0 0 0 0 0 0  ...
+w0 bufData: 1 0 0 0 0 0 0 0 0 0  ...
+blocSize: 1000
+n: 8
+w1 bufData: 1 0 0 0 0 0 0 0 0 0  ...
+w bufData: 1 0 0 0 0 0 0 0 0 0  ...
+s bufData: 1 0 0 0 0 0 0 0 0 0  ...
+m bufData: 9 0 0 0 0 0 0 0 0 0  ...
+m bufAux: 9 0 0 0 0 0 0 0 0 0  ...
+bufData: 9 0 0 0 0 0 0 0 0 0  ...
+20250308 02:06:06 20996011 OK         0 on-load: blockSize 1000, 0000000000000009
+bufData: 9 0 0 0 0 0 0 0 0 0  ...
+20250308 02:06:06 20996011 Proof of power 9 requires about 1.3GB of disk space
+ok: 0
+20250308 02:06:06 20996011 OK      2000 3f4960dd10a642f9  290 ETA 01:42; Z=171 (avg 171.3)
+20250308 02:06:09 20996011        20000 69aa4d85a4e63382  149
+...
+20250308 02:59:05 20996011     20960000 3435216b8d689d43  152
+20250308 02:59:08 20996011     20980000 6fcd81dfd9b45e22  152
+20250308 02:59:11 20996011 PP 20996010 / 20996011, 0000000000000001
+ok: 0
+20250308 02:59:11 20996011 OK  20997000 6b31f3cd7f5fbf2b  152 ETA 00:00; Z=162 (avg 175.8)
+20250308 02:59:11 20996011 {"status":"P", "exponent":20996011, "worktype":"PRP-3", "res64":"0000000000000001", "res2048":"00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001", "residue-type":1, "errors":{"gerbicz":0}, "fft-length":1179648, "program":{"name":"prpll", "version":"7457abd-dirty", "port":8, "os":{"os":"Linux", "version":"6.8.0-54-generic", "architecture":"x86_64"}}, "uid":"d64a58a17330f0ed", "timestamp":"2025-03-08 01:59:11"}
+20250308 02:59:11 20996011 20996011 is PRIME!
+20250308 02:59:11  Bye
+hermann@7600x:~/gpuowl$ 
+```
+
+---
+
 ## Must read papers
 
 ### Multiplication by FFT
