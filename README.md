@@ -84,48 +84,81 @@ So with this option numbers with more than 118,370 decimal digits can be process
 
 [![Actions Status](https://github.com/preda/gpuowl/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/preda/gpuowl/actions/workflows/ci.yml)
 
-## first modification
+## second modification
 
-With unclean working commit [3faae90](https://github.com/Hermann-SW/gpuowl/commit/3faae90a4af2d9964c387dfdb9e58caa5c2dc402):  
-- start with 9 instead of 3
-- number or squarings reduced by 1
+After undoing pevious first modification changes, small working commit [7aff627](https://github.com/Hermann-SW/gpuowl/commit/7aff62799b4f6cfa5c265d3252a80a164afe733f):  
+- start with 3^(2^17) instead of 3
+- number or squarings reduced by 17
 - proof generation turned off for now
 
-Long run to verify that PRP is determined correctly:  
+Reason for 17 is that it is largest x with 3^(2^x)<2^393216-1.  
+For more a mod operation is needed, but I see modmul only.  
+This will allow to process Proth primes k*2^n+1 with k<2^17, which covers many k values.
+
+For determining the final res64 value 5a4fc71ea32bbf33 for Mersenne prime 2^393216-1, execute unmodified prpll:
 ```
-hermann@7600x:~/gpuowl$ rm -rf 20996011 && build-release/prpll -prp 20996011 2>err
-20250308 02:06:04  PRPLL 7457abd-dirty starting
-20250308 02:06:04  config: -prp 20996011 
-20250308 02:06:04  device 0, OpenCL 3635.0 (HSA1.1,LC), unique id 'd64a58a17330f0ed'
-20250308 02:06:04 20996011 config: 
-20250308 02:06:04 20996011 FFT: 1152K 256:9:256:2:0 (17.80 bpw)
-bufData: 0 0 0 0 0 0 0 0 0 0  ...
-bufData: 0 0 0 0 0 0 0 0 0 0  ...
-w bufData: 0 0 0 0 0 0 0 0 0 0  ...
-w0 bufData: 1 0 0 0 0 0 0 0 0 0  ...
-blocSize: 1000
-n: 8
-w1 bufData: 1 0 0 0 0 0 0 0 0 0  ...
-w bufData: 1 0 0 0 0 0 0 0 0 0  ...
-s bufData: 1 0 0 0 0 0 0 0 0 0  ...
-m bufData: 9 0 0 0 0 0 0 0 0 0  ...
-m bufAux: 9 0 0 0 0 0 0 0 0 0  ...
-bufData: 9 0 0 0 0 0 0 0 0 0  ...
-20250308 02:06:06 20996011 OK         0 on-load: blockSize 1000, 0000000000000009
-bufData: 9 0 0 0 0 0 0 0 0 0  ...
-20250308 02:06:06 20996011 Proof of power 9 requires about 1.3GB of disk space
-ok: 0
-20250308 02:06:06 20996011 OK      2000 3f4960dd10a642f9  290 ETA 01:42; Z=171 (avg 171.3)
-20250308 02:06:09 20996011        20000 69aa4d85a4e63382  149
+hermann@7600x:~/preda/gpuowl$ rm -rf 393216 && build-release/prpll -prp 393216 -fft 256:1:256 2>err
+20250308 10:55:21  PRPLL 0.15-125-ga1349df starting
+20250308 10:55:21  config: -prp 393216 -fft 256:1:256 
+20250308 10:55:21  device 0, OpenCL 3635.0 (HSA1.1,LC), unique id 'd64a58a17330f0ed'
+20250308 10:55:21 393216 BPW info for 256:1:256 not found, defaults={19.67, 19.77, 19.77, 19.87}
+20250308 10:55:21 393216 config: 
+20250308 10:55:21 393216 FFT: 128K 256:1:256:3 (3.00 bpw)
+20250308 10:55:21 393216 Using long carry!
+20250308 10:55:23 393216 OK         0 on-load: blockSize 1000, 0000000000000003
+20250308 10:55:23 393216 Proof of power 6 requires about 0.0GB of disk space
+20250308 10:55:23 393216 OK      2000 3e539848c5ad042a   83 ETA 00:01; Z=1650159308834 (avg 1650159308833.7)
+20250308 10:55:24 393216        20000 02b0f7395bd4f667   40
 ...
-20250308 02:59:05 20996011     20960000 3435216b8d689d43  152
-20250308 02:59:08 20996011     20980000 6fcd81dfd9b45e22  152
-20250308 02:59:11 20996011 PP 20996010 / 20996011, 0000000000000001
+20250308 10:55:37 393216       360000 0821c32399e6fd7b   40
+20250308 10:55:38 393216       380000 3e2efc6c0a54d4b1   40
+20250308 10:55:39 393216 CC   393216 / 393216, 5a4fc71ea32bbf33
+...
+hermann@7600x:~/preda/gpuowl$ 
+```
+
+Here is full log of run with starting after 17× squaring of 3.  
+It has same res64 value, and the number of loopw reported on left side of "/" is reduced by 17:  
+```
+20250308 13:11:13 393216 CC   393199 / 393216, 5a4fc71ea32bbf33
+```
+
+```
+hermann@7600x:~/gpuowl$ rm -rf 393216 && build-release/prpll -prp 393216 -fft 256:1:256
+20250308 13:10:55  PRPLL cf63750-dirty starting
+20250308 13:10:55  config: -prp 393216 -fft 256:1:256 
+20250308 13:10:55  device 0, OpenCL 3635.0 (HSA1.1,LC), unique id 'd64a58a17330f0ed'
+20250308 13:10:56 393216 config: 
+20250308 13:10:56 393216 FFT: 128K 256:1:256:3 (3.00 bpw)
+20250308 13:10:56 393216 Using long carry!
+20250308 13:10:57 393216 OK         0 on-load: blockSize 1000, e15c9645d1e80001
+20250308 13:10:57 393216 Proof of power 6 requires about 0.0GB of disk space
 ok: 0
-20250308 02:59:11 20996011 OK  20997000 6b31f3cd7f5fbf2b  152 ETA 00:00; Z=162 (avg 175.8)
-20250308 02:59:11 20996011 {"status":"P", "exponent":20996011, "worktype":"PRP-3", "res64":"0000000000000001", "res2048":"00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001", "residue-type":1, "errors":{"gerbicz":0}, "fft-length":1179648, "program":{"name":"prpll", "version":"7457abd-dirty", "port":8, "os":{"os":"Linux", "version":"6.8.0-54-generic", "architecture":"x86_64"}}, "uid":"d64a58a17330f0ed", "timestamp":"2025-03-08 01:59:11"}
-20250308 02:59:11 20996011 20996011 is PRIME!
-20250308 02:59:11  Bye
+20250308 13:10:57 393216 OK      2000 b192ad656d2f13fe   82 ETA 00:01; Z=1647538368454 (avg 1647538368454.4)
+20250308 13:10:58 393216        20000 78e0172f78f1f0f7   41
+20250308 13:10:59 393216        40000 6a70b33d9535f3a6   40
+20250308 13:11:00 393216        60000 366a89b689f6af1e   40
+20250308 13:11:00 393216        80000 45b5ad4972ff9360   40
+20250308 13:11:01 393216       100000 35c33f4c433245f9   40
+20250308 13:11:02 393216       120000 fe8a9792aeb98ad4   40
+20250308 13:11:03 393216       140000 f4b6d7b96e6e3c17   40
+20250308 13:11:04 393216       160000 8fa618787e6bd16f   40
+20250308 13:11:04 393216       180000 78b6c3a257e8f2b8   40
+20250308 13:11:05 393216       200000 7977e901e4ffb110   40
+20250308 13:11:06 393216       220000 7036bff94d861fc9   40
+20250308 13:11:07 393216       240000 b7230d749dfe0ed8   40
+20250308 13:11:08 393216       260000 917b6d6c1decee31   40
+20250308 13:11:09 393216       280000 474f366f18b6fb36   40
+20250308 13:11:09 393216       300000 1bc62746d9b8a355   40
+20250308 13:11:10 393216       320000 0df633d3d3b7be8d   40
+20250308 13:11:11 393216       340000 e3de60bd090f2a41   40
+20250308 13:11:12 393216       360000 59d745697c0c9f79   40
+20250308 13:11:13 393216       380000 3db4b9c59eeba5b1   40
+20250308 13:11:13 393216 CC   393199 / 393216, 5a4fc71ea32bbf33
+ok: 0
+20250308 13:11:13 393216 OK    394000 137eec8dd9d059f6   40 ETA 00:00; Z=2545104975546 (avg 1797257568970.2)
+20250308 13:11:13 393216 {"status":"C", "exponent":393216, "worktype":"PRP-3", "res64":"5a4fc71ea32bbf33", "res2048":"8ccc892782332df135d76d31b3b3029d6a842790791a4e5b0478c7a2cea219ad54a6829d0842d72eef8417f05f069f1de2152f3494a950781c4e5e9f3b8139239fc6aac7a4dedf310d8ae413354df4ad9550ceafb1f6fdec18eb51658b239cb68f5890049bdcba2c58f1e8c438d84ef45e1004232bd24921e288fdb45c2300ebc5c4a1bce93938f1458b7b985fe4cfe7a65a22c18132153a5fe7960664bc996f53e7c531fc6f3c4b97db0ff33db9232782c83436d0100d8d5aae0def3241c61ef230776eb4a1cc437742e1e53c8f9d694d26f17ee4663dd118bf3b8b8ad45e17029de16cfbcbbe1f38e2c15223dbe9973fd816c09aecb5f65a4fc71ea32bbf33", "residue-type":1, "errors":{"gerbicz":0}, "fft-length":131072, "program":{"name":"prpll", "version":"cf63750-dirty", "port":8, "os":{"os":"Linux", "version":"6.8.0-55-generic", "architecture":"x86_64"}}, "uid":"d64a58a17330f0ed", "timestamp":"2025-03-08 12:11:13"}
+20250308 13:11:13  Bye
 hermann@7600x:~/gpuowl$ 
 ```
 
