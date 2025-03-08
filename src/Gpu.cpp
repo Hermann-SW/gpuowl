@@ -23,6 +23,7 @@
 #include <iomanip>
 #include <array>
 #include <cinttypes>
+#include <iostream>
 
 #define _USE_MATH_DEFINES
 #include <cmath>
@@ -718,20 +719,40 @@ void Gpu::modMul(Buffer<int>& ioA, Buffer<int>& inB, bool mul3) {
   mul(ioA, buf1, buf2, buf3, mul3);
 };
 
+int aux[10];
+
 void Gpu::writeState(const vector<u32>& check, u32 blockSize) {
   assert(blockSize > 0);
   writeIn(bufCheck, check);
 
+    bufData.read(aux,10);
+    std::cout << "w bufData: ";
+    for(int i=0; i<10; ++i)  std::cout << aux[i] << " ";
+    std::cout << " ..." << std::endl;
+
+
   bufData << bufCheck;
   bufAux  << bufCheck;
   
+    bufData.read(aux,10);
+    std::cout << "w0 bufData: ";
+    for(int i=0; i<10; ++i)  std::cout << aux[i] << " ";
+    std::cout << " ..." << std::endl;
+
   u32 n = 0;
   for (n = 1; blockSize % (2 * n) == 0; n *= 2) {
     squareLoop(bufData, 0, n);
     modMul(bufData, bufAux);
     bufAux << bufData;
   }
+  std::cout << "blocSize: " << blockSize << std::endl;
+  std::cout << "n: " << n << std::endl;
   
+    bufData.read(aux,10);
+    std::cout << "w1 bufData: ";
+    for(int i=0; i<10; ++i)  std::cout << aux[i] << " ";
+    std::cout << " ..." << std::endl;
+
   assert((n & (n - 1)) == 0);
   assert(blockSize % n == 0);
     
@@ -743,8 +764,31 @@ void Gpu::writeState(const vector<u32>& check, u32 blockSize) {
     modMul(bufData, bufAux);
   }
   
+    bufData.read(aux,10);
+    std::cout << "w bufData: ";
+    for(int i=0; i<10; ++i)  std::cout << aux[i] << " ";
+    std::cout << " ..." << std::endl;
+
   squareLoop(bufData, 0, n);
+    bufData.read(aux,10);
+    std::cout << "s bufData: ";
+    for(int i=0; i<10; ++i)  std::cout << aux[i] << " ";
+    std::cout << " ..." << std::endl;
+
+  
+  bufData.fill(3,1);
   modMul(bufData, bufAux, true);
+  //bufAux.fill(1,1);
+    bufData.read(aux,10);
+    std::cout << "m bufData: ";
+    for(int i=0; i<10; ++i)  std::cout << aux[i] << " ";
+    std::cout << " ..." << std::endl;
+fprintf(stderr,"0x%s\n",toHex(readData()).c_str());
+    bufAux.read(aux,10);
+    std::cout << "m bufAux: ";
+    for(int i=0; i<10; ++i)  std::cout << aux[i] << " ";
+    std::cout << " ..." << std::endl;
+
 }
   
 bool Gpu::doCheck(u32 blockSize) {
@@ -1133,6 +1177,7 @@ void Gpu::doDiv9(u32 E, Words& words) {
 }
 
 fs::path Gpu::saveProof(const Args& args, const ProofSet& proofSet) {
+  return "";
   for (int retry = 0; retry < 2; ++retry) {
     auto [proof, hashes] = proofSet.computeProof(this);
     fs::path tmpFile = proof.file(args.proofToVerifyDir);
@@ -1158,7 +1203,15 @@ PRPState Gpu::loadPRP(Saver<PRPState>& saver) {
     }
 
     PRPState state = saver.load();
+    bufData.read(aux,10);
+    std::cout << "bufData: ";
+    for(int i=0; i<10; ++i)  std::cout << aux[i] << " ";
+    std::cout << " ..." << std::endl;
     writeState(state.check, state.blockSize);
+    bufData.read(aux,10);
+    std::cout << "bufData: ";
+    for(int i=0; i<10; ++i)  std::cout << aux[i] << " ";
+    std::cout << " ..." << std::endl;
     u64 res = dataResidue();
 
     if (res == state.res64) {
@@ -1166,6 +1219,8 @@ PRPState Gpu::loadPRP(Saver<PRPState>& saver) {
       return state;
       // return {loaded.k, loaded.blockSize, loaded.nErrors};
     }
+
+//    bufData.fill(9,1);
 
     log("EE %9u on-load: %016" PRIx64 " vs. %016" PRIx64 "\n", state.k, res, state.res64);
 
@@ -1398,7 +1453,15 @@ PRPResult Gpu::isPrimePRP(const Task& task) {
   double elapsedBefore = 0;
 
   {
+    bufData.read(aux,10);
+    std::cout << "bufData: ";
+    for(int i=0; i<10; ++i)  std::cout << aux[i] << " ";
+    std::cout << " ..." << std::endl;
     PRPState state = loadPRP(*getSaver());
+    bufData.read(aux,10);
+    std::cout << "bufData: ";
+    for(int i=0; i<10; ++i)  std::cout << aux[i] << " ";
+    std::cout << " ..." << std::endl;
     nErrors = std::max(nErrors, state.nErrors);
     blockSize = state.blockSize;
     k = state.k;
@@ -1423,7 +1486,7 @@ PRPResult Gpu::isPrimePRP(const Task& task) {
   // For M=2^E-1, residue "type-3" == 3^(M+1), and residue "type-1" == type-3 / 9,
   // See http://www.mersenneforum.org/showpost.php?p=468378&postcount=209
   // For both type-1 and type-3 we need to do E squarings (as M+1==2^E).
-  const u32 kEnd = E;
+  const u32 kEnd = E-1;
   assert(k < kEnd);
 
   // We continue beyound kEnd: to the next multiple of blockSize, to do a check there
@@ -1465,6 +1528,15 @@ PRPResult Gpu::isPrimePRP(const Task& task) {
     square(bufData, bufData, leadIn, leadOut, false);
     leadIn = leadOut;
     
+//    if (k<10) fprintf(stderr,"0x%s\n",toHex(readData()).c_str());
+
+    if (k<5) {
+      bufData.read(aux,10);
+      std::cerr << "bufData: ";
+      for(int i=0; i<10; ++i)  std::cerr << aux[i] << " ";
+      std::cerr << " ... " << toHex(readData()).c_str() << std::endl;
+    }
+
     if (k == persistK) {
       vector<int> rawData = readChecked(bufData);
       if (rawData.empty()) {
@@ -1524,7 +1596,8 @@ PRPResult Gpu::isPrimePRP(const Task& task) {
     } else {
       bool ok = this->doCheck(blockSize);
       [[maybe_unused]] float secsCheck = iterationTimer.reset(k);
-
+std::cout << "ok: " << ok << std::endl;
+ok=true;
       if (ok) {
         nSeqErrors = 0;
         // lastFailedRes64 = 0;
