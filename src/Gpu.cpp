@@ -725,34 +725,18 @@ void Gpu::writeState(const vector<u32>& check, u32 blockSize) {
   assert(blockSize > 0);
   writeIn(bufCheck, check);
 
-    bufData.read(aux,10);
-    std::cout << "w bufData: ";
-    for(int i=0; i<10; ++i)  std::cout << aux[i] << " ";
-    std::cout << " ..." << std::endl;
 
 
   bufData << bufCheck;
   bufAux  << bufCheck;
   
-    bufData.read(aux,10);
-    std::cout << "w0 bufData: ";
-    for(int i=0; i<10; ++i)  std::cout << aux[i] << " ";
-    std::cout << " ..." << std::endl;
-
   u32 n = 0;
   for (n = 1; blockSize % (2 * n) == 0; n *= 2) {
     squareLoop(bufData, 0, n);
     modMul(bufData, bufAux);
     bufAux << bufData;
   }
-  std::cout << "blocSize: " << blockSize << std::endl;
-  std::cout << "n: " << n << std::endl;
   
-    bufData.read(aux,10);
-    std::cout << "w1 bufData: ";
-    for(int i=0; i<10; ++i)  std::cout << aux[i] << " ";
-    std::cout << " ..." << std::endl;
-
   assert((n & (n - 1)) == 0);
   assert(blockSize % n == 0);
     
@@ -764,17 +748,7 @@ void Gpu::writeState(const vector<u32>& check, u32 blockSize) {
     modMul(bufData, bufAux);
   }
   
-    bufData.read(aux,10);
-    std::cout << "w bufData: ";
-    for(int i=0; i<10; ++i)  std::cout << aux[i] << " ";
-    std::cout << " ..." << std::endl;
-
   squareLoop(bufData, 0, n);
-    bufData.read(aux,10);
-    std::cout << "s bufData: ";
-    for(int i=0; i<10; ++i)  std::cout << aux[i] << " ";
-    std::cout << " ..." << std::endl;
-
   
   bufData.fill(3,1);
   modMul(bufData, bufAux, true);
@@ -1203,15 +1177,7 @@ PRPState Gpu::loadPRP(Saver<PRPState>& saver) {
     }
 
     PRPState state = saver.load();
-    bufData.read(aux,10);
-    std::cout << "bufData: ";
-    for(int i=0; i<10; ++i)  std::cout << aux[i] << " ";
-    std::cout << " ..." << std::endl;
     writeState(state.check, state.blockSize);
-    bufData.read(aux,10);
-    std::cout << "bufData: ";
-    for(int i=0; i<10; ++i)  std::cout << aux[i] << " ";
-    std::cout << " ..." << std::endl;
     u64 res = dataResidue();
 
     if (res == state.res64) {
@@ -1453,15 +1419,7 @@ PRPResult Gpu::isPrimePRP(const Task& task) {
   double elapsedBefore = 0;
 
   {
-    bufData.read(aux,10);
-    std::cout << "bufData: ";
-    for(int i=0; i<10; ++i)  std::cout << aux[i] << " ";
-    std::cout << " ..." << std::endl;
     PRPState state = loadPRP(*getSaver());
-    bufData.read(aux,10);
-    std::cout << "bufData: ";
-    for(int i=0; i<10; ++i)  std::cout << aux[i] << " ";
-    std::cout << " ..." << std::endl;
     nErrors = std::max(nErrors, state.nErrors);
     blockSize = state.blockSize;
     k = state.k;
