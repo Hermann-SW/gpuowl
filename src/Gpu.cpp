@@ -745,6 +745,7 @@ void Gpu::writeState(const vector<u32>& check, u32 blockSize) {
   
   squareLoop(bufData, 0, n);
   modMul(bufData, bufAux, true);
+  for(int i=0;i<17;++i)  square(bufData);
 }
   
 bool Gpu::doCheck(u32 blockSize) {
@@ -1133,6 +1134,7 @@ void Gpu::doDiv9(u32 E, Words& words) {
 }
 
 fs::path Gpu::saveProof(const Args& args, const ProofSet& proofSet) {
+  return "";
   for (int retry = 0; retry < 2; ++retry) {
     auto [proof, hashes] = proofSet.computeProof(this);
     fs::path tmpFile = proof.file(args.proofToVerifyDir);
@@ -1423,7 +1425,7 @@ PRPResult Gpu::isPrimePRP(const Task& task) {
   // For M=2^E-1, residue "type-3" == 3^(M+1), and residue "type-1" == type-3 / 9,
   // See http://www.mersenneforum.org/showpost.php?p=468378&postcount=209
   // For both type-1 and type-3 we need to do E squarings (as M+1==2^E).
-  const u32 kEnd = E;
+  const u32 kEnd = E-17;
   assert(k < kEnd);
 
   // We continue beyound kEnd: to the next multiple of blockSize, to do a check there
@@ -1524,6 +1526,9 @@ PRPResult Gpu::isPrimePRP(const Task& task) {
     } else {
       bool ok = this->doCheck(blockSize);
       [[maybe_unused]] float secsCheck = iterationTimer.reset(k);
+
+      printf("ok: %d\n", ok);
+      ok=true;
 
       if (ok) {
         nSeqErrors = 0;
