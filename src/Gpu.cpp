@@ -745,7 +745,8 @@ void Gpu::writeState(const vector<u32>& check, u32 blockSize) {
   
   squareLoop(bufData, 0, n);
   modMul(bufData, bufAux, true);
-  for(int i=0;i<17;++i)  square(bufData);
+  exponentiate(bufData, (1<<17)-1, buf1, buf2, buf3);
+  modMul(bufData, bufAux, true);
 }
   
 bool Gpu::doCheck(u32 blockSize) {
