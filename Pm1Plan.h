@@ -3,6 +3,7 @@
 
 #include "common.h"
 
+#include <array>
 #include <vector>
 #include <tuple>
 #include <bitset>

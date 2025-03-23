@@ -12,6 +12,7 @@
 #include "AllocTrac.h"
 #include "Queue.h"
 
+#include <array>
 #include <cmath>
 #include <cstring>
 #include <algorithm>

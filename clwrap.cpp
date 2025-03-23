@@ -5,6 +5,7 @@
 #include "AllocTrac.h"
 #include "clwrap.h"
 
+#include <array>
 #include <cstdio>
 #include <cstdarg>
 #include <cassert>
